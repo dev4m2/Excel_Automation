@@ -1,0 +1,14 @@
+
+
+SpecialCells(xlCellTypeVisible) Range issues.
+https://social.msdn.microsoft.com/Forums/office/en-US/0c991808-e424-403e-8a5e-921a77953ff4/specialcellsxlcelltypevisible-range-issues?forum=exceldev
+
+
+The bad news...
+SpecialCells is returning a non-contiguous range and the Rows.Count method returns the row count for the first area of the multiple area range.  You have to loop thru each area and sum the row count for each area.
+
+The good news...
+The AutoFilter method has a Range property that returns the entire range that the auto filter uses.
+So you don't have to find the last row.
+One can use that Range (property) to determine the filtered range:
+   Set rngFiltered = wsOne.AutoFilter.Range.SpecialCells(xlCellTypeVisible)
