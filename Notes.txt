@@ -12,3 +12,11 @@ The AutoFilter method has a Range property that returns the entire range that th
 So you don't have to find the last row.
 One can use that Range (property) to determine the filtered range:
    Set rngFiltered = wsOne.AutoFilter.Range.SpecialCells(xlCellTypeVisible)
+
+
+
+Issues
+Financial Sample.xlsx
+
+has field names surrounded by spaces
+example: Product field is actually " Product "
