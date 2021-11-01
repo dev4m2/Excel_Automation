@@ -41,6 +41,9 @@ $FilePath = $Filename + "." + $FilenameExtension
 $FileBackupPath = $Filename + ".bak" + "." + $FilenameExtension
 $FileModifiedPath = $Filename + " " + $Date + "." + $FilenameExtension
 
+# EXCEL WORKBOOK PASSWORD
+$WorkbookPassword = "password"
+
 # EXCEL WORKSHEET
 $WorksheetName = "Sheet1"
 
@@ -49,6 +52,7 @@ $WorksheetModifiedName = "Modified"
 
 # COLUMNS IDENTIFIED FOR DELETION
 $DeleteColumnsArray = @("Discount Band", "Units Sold")
+$RetainedHeadersArray = @("Segment", "Country", "Product", "Date", "Month Number", "Month Name", "Year")
 
 
 # FUNCTIONS
@@ -95,10 +99,13 @@ $objExcel.Visible = $true
 $WorkBook = $objExcel.Workbooks.Open($FileModifiedPath)
 
 
+$TestWorksheetCount = $WorkBook.Worksheets.Count
+
+
 # BACKUP WORKBOOK (WITH PASSWORD)
 $objExcel.DisplayAlerts = $false; # Note: "$false" = Do not prompt for confirmation to "over-write" backup file.
 # $WorkBook.SaveAs($FileBackupPath)
-$WorkBook.SaveAs($FileModifiedPath, [Type]::Missing, "password")
+$WorkBook.SaveAs($FileModifiedPath, [Type]::Missing, $WorkbookPassword)
 
 
 # ADD NEW WORKSHEET TO WORKBOOK
@@ -122,25 +129,48 @@ $WorkBook.Worksheets[$WorksheetName].Activate()
 $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
 
 
-#region DELETE SPECIFIED COLUMNS
-# Create array of column names to delete
-foreach ($FieldName in $DeleteColumnsArray) {
-    $ColumnIndex = 0
+# #region DELETE SPECIFIED COLUMNS
+# # Create array of column names to delete
+# foreach ($FieldName in $DeleteColumnsArray) {
+#     $ColumnIndex = 0
 
-    # GET HEADER ROW
-    $AdjustedHeaderRowArray = @() # Clear array
-    $AdjustedHeaderRowArray = $WorkSheet.UsedRange.Rows(1).Cells
+#     # GET HEADER ROW
+#     $AdjustedHeaderRowArray = @() # Clear array
+#     $AdjustedHeaderRowArray = $WorkSheet.UsedRange.Rows(1).Cells
 
-    foreach ($Column in $AdjustedHeaderRowArray) {
+#     foreach ($Column in $AdjustedHeaderRowArray) {
+#         $ColumnIndex++
+#         $ColumnText = $Column.Text
+#         if ($ColumnText -eq $FieldName) {
+#             $WorkSheet.Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
+#             break
+#         }
+#     }
+# }
+# #endregion DELETE SPECIFIED COLUMNS
+
+
+#region RETAIN SPECIFIED COLUMNS
+$ColumnIndex = 1
+$FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
+
+while ($ColumnIndex -le $FieldCount) {
+    $Column = $WorkSheet.UsedRange.Rows(1).Cells[$ColumnIndex]
+    $ColumnText = $Column.Text
+
+    if ($RetainedHeadersArray -match $ColumnText) {
+        # $ResponseText = "Field Header: '" + $ColumnText + "' should be retained."
         $ColumnIndex++
-        $ColumnText = $Column.Text
-        if ($ColumnText -eq $FieldName) {
-            $WorkSheet.Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
-            break
-        }
     }
+    else {
+        # $ResponseText = "Field Header: '" + $ColumnText + "' should be DELETED."
+        $WorkSheet.Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
+        $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
+    }
+
+    # Write-Output $ResponseText
 }
-#endregion DELETE SPECIFIED COLUMNS
+#endregion RETAIN SPECIFIED COLUMNS
 
 
 #region CELL VALUE
