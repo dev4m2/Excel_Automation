@@ -79,6 +79,36 @@ function FindHeaderColumnIndex {
 #endregion FIND HEADER COLUMN INDEX
 
 
+# #region RETURN COLUMN CONTENTS
+# function ReturnColumnContents {
+#     param ($refColumnArray)
+
+#     $refColumnContentsArray = @()
+#     foreach ($refRowItem in $refColumnArray) {
+
+#     }
+
+
+#     return $refColumnContentsArray
+# }
+# #endregion RETURN COLUMN CONTENTS
+
+
+#region RETURN MATCHING ARRAY ITEMS
+function ReturnMatchingArrayItems {
+    param ($refArray, $refSearchString)
+
+    $refMatchingItemsArray = @()
+    foreach ($refTextItem in $refArray) {
+        if ($refTextItem -Like $refSearchString) {
+            $refMatchingItemsArray += $refTextItem
+        }
+    }
+    return $refMatchingItemsArray
+}
+#region RETURN MATCHING ARRAY ITEMS
+
+
 # BACKUP FILE(S)
 # Copy-Item $FilePath -Destination $FileBackupPath -Force
 Copy-Item $FilePath -Destination $FileModifiedPath -Force
@@ -99,7 +129,7 @@ $objExcel.Visible = $true
 $WorkBook = $objExcel.Workbooks.Open($FileModifiedPath)
 
 
-$TestWorksheetCount = $WorkBook.Worksheets.Count
+# $TestWorksheetCount = $WorkBook.Worksheets.Count
 
 
 # BACKUP WORKBOOK (WITH PASSWORD)
@@ -192,7 +222,7 @@ $Notice = "The total number of rows is: '" + $RowCount + "'"
 #endregion NUMBER OF WORKSHEET ROWS
 
 
-#region GET HEADER ROW
+#region GET HEADER ROW ARRAY
 $HeaderRowArray = @() # Clear array
 $HeaderRowArray = $WorkSheet.UsedRange.Rows(1).Cells
 #endregion GET HEADER ROW
@@ -204,6 +234,40 @@ $HeaderRowArray = $WorkSheet.UsedRange.Rows(1).Cells
 # $Notice = "The total number of columns is: '" + $ColumnCount + "'"
 # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
 #endregion FIND HEADER COLUMN COUNT
+
+
+#region APPLY AUTOFILTER
+# FIND HEADER COLUMN INDEX
+$FilterFieldName = "Country"
+$FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterFieldName
+
+
+# FIND COLUMN CONTENTS
+$ColumnContentsArray = @()
+# $ColumnContentsArray = $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells
+foreach ($Cell in $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells) {
+    $ColumnContentsArray += $Cell.Text
+}
+
+
+# AUTOFILTER CRITERIA
+$SearchString = "Franc*"
+$MatchingArrayItems = @()
+$MatchingArrayItems = ReturnMatchingArrayItems $ColumnContentsArray $SearchString
+
+
+# DE-DUPE AND SORT
+$MatchingArrayItems = $MatchingArrayItems | Sort-Object -Unique
+
+
+# AUTOFILTER CRITERIA
+$FilterCriteriaArray = @()
+$FilterCriteriaArray += $MatchingArrayItems
+$WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
+#endregion APPLY AUTOFILTER
+
+
+
 
 
 #region APPLY AUTOFILTER
