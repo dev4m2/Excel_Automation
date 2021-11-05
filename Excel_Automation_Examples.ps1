@@ -46,27 +46,29 @@ $FilePathFieldFilters = $FileDirectory + $Filename + " - Filters" + "." + "csv"
 # EXCEL WORKBOOK PASSWORD
 $WorkbookPassword = "password"
 
-# EXCEL WORKSHEET
-$WorksheetName = "Sheet1"
+# EXCEL PRIMARY WORKSHEET NAME
+# $WorksheetName = "Sheet1"
 
-# NEW EXCEL WORKSHEET
-$WorksheetModifiedName = "Modified"
+# EXCEL WORKSHEET OBJECT
+$WorkSheet = $null
+
+# HEADER ROW ARRAY
+$HeaderRowArray = @()
 
 # COLUMNS IDENTIFIED FOR DELETION
 # $DeleteColumnsArray = @("Discount Band", "Units Sold")
 
 # COLUMNS IDENTIFIED FOR RETENTION
-# $RetainedHeadersArray = @("Segment", "Country", "Product", "Date", "Month Number", "Month Name", "Year")
+# $RetainedHeadersArray = @("Header", "Segment", "Country", "Product", "Date", "Month Number", "Month Name", "Year")
 $RetainedHeadersArray = Import-Csv -Path $FilePathRetainedHeaders -Delimiter ","
 
 # COLUMNS TO BE FILTERED
-# $FieldFiltersArray = Import-Csv -Path $FilePathFieldFilters -Delimiter ","
 $FieldFiltersArray = Get-Content -Path $FilePathFieldFilters
 
 
 # FUNCTIONS
 
-#region FIND HEADER COLUMN INDEX
+#region FUNCTION - FIND HEADER COLUMN INDEX
 function FindHeaderColumnIndex {
     param ($refHeaderRowArray, $refFilterFieldName)
 
@@ -85,10 +87,10 @@ function FindHeaderColumnIndex {
     }
     return $IndexResult
 }
-#endregion FIND HEADER COLUMN INDEX
+#endregion FUNCTION - FIND HEADER COLUMN INDEX
 
 
-#region RETURN MATCHING ARRAY ITEMS
+#region FUNCTION - RETURN MATCHING ARRAY ITEMS
 function ReturnMatchingArrayItems {
     # param ($refArray, $refSearchString)
     param ([string[]]$refArray, [string]$refSearchString)
@@ -101,14 +103,7 @@ function ReturnMatchingArrayItems {
     }
     return $refMatchingItemsArray
 }
-#endregion RETURN MATCHING ARRAY ITEMS
-
-
-#region RETAIN SPECIFIED COLUMNS
-# function RetainSpecifiedColumns {
-#     param ()
-# }
-#endregion RETAIN SPECIFIED COLUMNS
+#endregion FUNCTION - RETURN MATCHING ARRAY ITEMS
 
 
 # BACKUP FILE(S)
@@ -125,40 +120,14 @@ $objExcel = New-Object -ComObject Excel.Application
 # Disable the 'visible' property so the document won't open in excel
 $objExcel.Visible = $true
 
-
 # OPEN THE EXCEL FILE
 # $WorkBook = $objExcel.Workbooks.Open($FilePath)
 $WorkBook = $objExcel.Workbooks.Open($FilePathModified)
-
-
-# $TestWorksheetCount = $WorkBook.Worksheets.Count
-
 
 # BACKUP WORKBOOK (WITH PASSWORD)
 $objExcel.DisplayAlerts = $false; # Note: "$false" = Do not prompt for confirmation to "over-write" backup file.
 # $WorkBook.SaveAs($FilePathBackup)
 $WorkBook.SaveAs($FilePathModified, [Type]::Missing, $WorkbookPassword)
-
-
-# ADD NEW WORKSHEET TO WORKBOOK
-# $WorkBook.Worksheets.Add($WorksheetModifiedName)
-# $WorkBook.Worksheets.Add([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$WorkBook.Worksheets.Count], 1, $WorkBook.Worksheets[1].Type)
-
-
-# COPY WORKSHEET
-$WorkBook.Worksheets[$WorksheetName].Copy([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$WorkBook.Worksheets.Count])
-
-
-# RENAME WORKSHEET
-$WorkBook.Worksheets[$WorkBook.Worksheets.Count].Name = $WorksheetModifiedName
-
-
-# ACTIVATE WORKSHEET
-$WorkBook.Worksheets[$WorksheetName].Activate()
-
-
-# SET REFERENCE TO WORKSHEET OBJECT
-$WorkSheet = $WorkBook.Worksheets[$WorksheetName]
 
 
 #region DELETE SPECIFIED COLUMNS
@@ -182,30 +151,6 @@ $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
 #endregion DELETE SPECIFIED COLUMNS
 
 
-#region RETAIN SPECIFIED COLUMNS
-$ColumnIndex = 1
-$FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
-
-while ($ColumnIndex -le $FieldCount) {
-    $Column = $WorkSheet.UsedRange.Rows(1).Cells[$ColumnIndex]
-    $ColumnText = $Column.Text
-
-    # if ($RetainedHeadersArray -match $ColumnText) {
-    if ($RetainedHeadersArray.Header -match $ColumnText) {
-        # $ResponseText = "Field Header: '" + $ColumnText + "' should be retained."
-        $ColumnIndex++
-    }
-    else {
-        # $ResponseText = "Field Header: '" + $ColumnText + "' should be DELETED."
-        $WorkSheet.Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
-        $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
-    }
-
-    # Write-Output $ResponseText
-}
-#endregion RETAIN SPECIFIED COLUMNS
-
-
 #region CELL VALUE
 # $CellValue = $WorkSheet.Cells[1, 2].Text
 # $Notice = "The cell value is: '" + $CellValue + "'"
@@ -218,82 +163,149 @@ while ($ColumnIndex -le $FieldCount) {
 #endregion MODIFY CELL VALUE
 
 
-#region NUMBER OF WORKSHEET ROWS
-$RowCount = $WorkSheet.UsedRange.Rows.Count
-$Notice = "The total number of rows is: '" + $RowCount + "'"
-[System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
-#endregion NUMBER OF WORKSHEET ROWS
-
-
-#region GET HEADER ROW ARRAY
-$HeaderRowArray = @() # Clear array
-$HeaderRowArray = $WorkSheet.UsedRange.Rows(1).Cells
-#endregion GET HEADER ROW
-
-
-#region FIND HEADER COLUMN COUNT
-# $ColumnCount = 0
-# $ColumnCount = $HeaderRowArray.Count
-# $Notice = "The total number of columns is: '" + $ColumnCount + "'"
-# [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
-#endregion FIND HEADER COLUMN COUNT
-
-
-
-
-
-
-
-
-
-
-
-
 #region APPLY AUTOFILTER
-foreach ($Record in $FieldFiltersArray) {
+# READ EACH RECORD INTO ARRAY
+# Note: Start with 2nd item in array (i.e. Exclude the column header name).
+for ($intRecordCounter=1; $intRecordCounter -lt $FieldFiltersArray.Count; $intRecordCounter++) {
+    $Record = ""
+    $Record = $FieldFiltersArray[$intRecordCounter]
+
     # CLEAR AUTOFILTER CRITERIA
     [string[]]$FilterCriteriaArray = @()
 
-    # CLEAR COLUMN CONTENTS
-    $ColumnContentsArray = @()
+    # CLEAR REFINED COLUMN CONTENTS
+    $ColumnTextArray = @()
 
+    # CLEAR FILTER FIELD INDEX
+    $FilterFieldIndex = 0
+
+    # PARSE EACH ROW ITEM (FROM THE FILTERS FILE)
+    $FilterArray = @()
     $FilterArray = $Record.Split(",")
-    for ($intCriteriaCounter=0; $intCriteriaCounter -lt $FilterArray.Length; $intCriteriaCounter++) {
-        $FilterItem = $FilterArray[$intCriteriaCounter]
+
+    # REMOVE EMPTY ARRAY ITEMS
+    $TrimmedFilterArray = @()
+    foreach ($Item in $FilterArray) {
+        if (-not ([string]::IsNullOrWhiteSpace($Item))) {
+            $TrimmedFilterArray += $Item
+        }
+    }
+
+    # POPULATE FILTER ARRAY (NO EMPTY ITEMS)
+    $FilterArray = @()
+    $FilterArray += $TrimmedFilterArray
+
+    # LOOP THROUGH FILTER ARRAY
+    for ($intFieldCounter=0; $intFieldCounter -lt $FilterArray.Length; $intFieldCounter++) {
+        # GET FILTER ITEM (FROM THE FILTERS FILE)
+        $FilterItem = ""
+        $FilterItem = $FilterArray[$intFieldCounter] # Example: "Country,Can*,Franc*,Germ*"
+
         if (-not ([string]::IsNullOrWhiteSpace($FilterItem))) {
-            if ($intCriteriaCounter -eq 0) {
-                # FIND HEADER COLUMN INDEX
-                $FilterFieldName = $FilterItem
-                $FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterFieldName
+            switch ($intFieldCounter) 
+            {
+                0 {
+                    # WORKSHEET EXISTENCE
+                    $WorksheetExists = $false
 
-                # FIND COLUMN CONTENTS
-                $ColumnContentsArray = @()
-                $ColumnContentsArray = $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells
-                # foreach ($Cell in $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells) {
-                #     $ColumnContentsArray += $Cell.Text
-                # }
+                    # NEW WORKSHEET NAME
+                    $NewWorksheetName = $FilterItem
 
-                $ColumnTextArray = @()
-                # $ColumnContentsTotalCount = $ColumnContentsArray.Count
-                for ($intCellCounter=2; $intCellCounter -le $ColumnContentsArray.Count; $intCellCounter++) {
-                    $ColumnTextArray += $ColumnContentsArray[$intCellCounter].Text
+                    # DOES WORKSHEET EXIST?
+                    foreach ($WorksheetTab in $WorkBook.Worksheets) {
+                        if ($WorksheetTab.Name -eq $NewWorksheetName) {
+                            $WorksheetExists = $true
+                        }
+                    }
+
+                    # ADD NEW WORKSHEET
+                    if ($WorksheetExists -eq $false) {
+                        # NUMBER OF WORKSHEETS IN WORKBOOK
+                        $intWorksheetCount = 0
+                        $intWorksheetCount = $WorkBook.Worksheets.Count
+
+                        # ADD NEW WORKSHEET TO WORKBOOK
+                        # $WorkBook.Worksheets.Add($NewWorksheetName)
+                        # $WorkBook.Worksheets.Add([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$intWorksheetCount], 1, $WorkBook.Worksheets[1].Type)
+
+                        # COPY PRIMARY WORKSHEET (TO LAST POSITION)
+                        # $WorkBook.Worksheets[$WorksheetName].Copy([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$intWorksheetCount])
+                        $WorkBook.Worksheets[1].Copy([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$intWorksheetCount])
+
+                        # RENAME WORKSHEET (IN LAST POSITION)
+                        $WorkBook.Worksheets[$intWorksheetCount + 1].Name = $NewWorksheetName
+
+                        # ACTIVATE WORKSHEET
+                        # $WorkBook.Worksheets[$WorksheetName].Activate()
+                        $WorkBook.Worksheets[$NewWorksheetName].Activate()
+
+                        # SET REFERENCE TO WORKSHEET OBJECT
+                        # $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
+                        $WorkSheet = $WorkBook.Worksheets[$NewWorksheetName]
+
+                        #region NUMBER OF ROWS IN WORKSHEET
+                        $RowCount = 0
+                        $RowCount = $WorkSheet.UsedRange.Rows.Count - 1
+                        $Notice = "The total number of rows is: '" + $RowCount + "'"
+                        [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+                        #endregion NUMBER OF ROWS IN WORKSHEET
+
+                        #region RETAIN SPECIFIED COLUMNS
+                        $ColumnIndex = 1
+                        $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
+
+                        while ($ColumnIndex -le $FieldCount) {
+                            $Column = $WorkSheet.UsedRange.Rows(1).Cells[$ColumnIndex]
+                            $ColumnText = $Column.Text
+
+                            # if ($RetainedHeadersArray -match $ColumnText) {
+                            if ($RetainedHeadersArray.Header -match $ColumnText) {
+                                # $ResponseText = "Field Header: '" + $ColumnText + "' should be retained."
+                                $ColumnIndex++
+                            }
+                            else {
+                                # $ResponseText = "Field Header: '" + $ColumnText + "' should be DELETED."
+                                $WorkSheet.Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
+                                $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
+                            }
+                            # Write-Output $ResponseText
+                        }
+                        #endregion RETAIN SPECIFIED COLUMNS
+
+                        # GET HEADER ROW ARRAY
+                        $HeaderRowArray = $WorkSheet.UsedRange.Rows(1).Cells
+                    }
                 }
 
-                # DE-DUPE AND SORT
-                $ColumnTextArray = $ColumnTextArray | Sort-Object -Unique
-            }
-            else {
-                # SEARCH ARRAY
-                $SearchString = $FilterItem # Example: "Can*"
-                $MatchingArrayItems = @()
-                # $MatchingArrayItems = ReturnMatchingArrayItems $ColumnContentsArray $SearchString
-                $MatchingArrayItems = ReturnMatchingArrayItems $ColumnTextArray $SearchString
+                1 {
+                    # CLEAR COLUMN CONTENTS
+                    $ColumnContentsArray = @()
 
-                # DE-DUPE AND SORT
-                # $MatchingArrayItems = $MatchingArrayItems | Sort-Object -Unique
+                    # FIND HEADER COLUMN INDEX
+                    $FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterItem # Example: "Country = 2nd column"
 
-                # ADD TO AUTOFILTER CRITERIA
-                $FilterCriteriaArray += $MatchingArrayItems
+                    # FIND COLUMN CONTENTS
+                    $ColumnContentsArray = $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells # Example: 700 rows
+
+                    # POPULATE COLUMN TEXT ARRAY WITH COLUMN CONTENTS (TEXT VALUES)
+                    # Note: Start with 2nd item in array (i.e. Exclude the column header name).
+                    for ($intCellCounter=2; $intCellCounter -le $ColumnContentsArray.Count; $intCellCounter++) {
+                        $ColumnTextArray += $ColumnContentsArray[$intCellCounter].Text
+                    }
+
+                    # DE-DUPE AND SORT
+                    # Note: Cannot sort "$ColumnContentsArray" as it contains objects and not just text.
+                    $ColumnTextArray = $ColumnTextArray | Sort-Object -Unique # Exmple: 8 rows
+                }
+
+                default {
+                    # SEARCH ARRAY
+                    $MatchingArrayItems = @()
+                    $MatchingArrayItems = ReturnMatchingArrayItems $ColumnTextArray $FilterItem # Example: Filter = "Can*; Result = "Canada"
+
+                    # ADD TO AUTOFILTER CRITERIA
+                    $FilterCriteriaArray += $MatchingArrayItems
+                }
             }
         }
         else {
@@ -303,46 +315,32 @@ foreach ($Record in $FieldFiltersArray) {
 
     # APPLY AUTOFILTER
     $WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
+
+    #region SELECT ALL FILTERED CELLS
+    # Note: "SpecialCells" returns a non-contiguous range. You must loop through each area.
+    $FilteredCells = $WorkSheet.AutoFilter.Range.SpecialCells($xlCellTypeVisible)
+    $FilteredCells.Select() # Prints "True" if successful.
+    #endregion SELECT ALL FILTERED CELLS
+
+    #region NUMBER OF FILTERED WORKSHEET ROWS
+    $FilteredRowCount = -1
+    foreach ($FilteredRow in $FilteredCells.Rows) {
+        $FilteredRowCount++
+    }
+    $Notice = "The number of filtered rows is: '" + $FilteredRowCount + "'"
+    [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+    #endregion NUMBER OF FILTERED WORKSHEET ROWS
 }
 #endregion APPLY AUTOFILTER
 
 
+# #region SELECT LAST FILTERED CELL
+# # $LastCell = $WorkSheet.UsedRange.SpecialCells($xlCellTypeLastCell)
+# # $LastCellRowIndex = $LastCell.Row
+# # $LastCellColumnIndex = $LastCell.Column
+# # $LastCell.Select()
+# #endregion SELECT LAST FILTERED CELL
 
-
-
-
-
-
-
-
-
-
-
-
-#region SELECT ALL FILTERED CELLS
-# Note: "SpecialCells" returns a non-contiguous range. You must loop through each area.
-# $FilteredCells = $WorkSheet.UsedRange.SpecialCells($xlCellTypeVisible)
-$FilteredCells = $WorkSheet.AutoFilter.Range.SpecialCells($xlCellTypeVisible)
-$FilteredCells.Select() # Prints "True" if successful.
-#endregion SELECT ALL FILTERED CELLS
-
-
-#region SELECT LAST FILTERED CELL
-# $LastCell = $WorkSheet.UsedRange.SpecialCells($xlCellTypeLastCell)
-# $LastCellRowIndex = $LastCell.Row
-# $LastCellColumnIndex = $LastCell.Column
-# $LastCell.Select()
-#endregion SELECT LAST FILTERED CELL
-
-
-#region NUMBER OF FILTERED WORKSHEET ROWS
-$RowCount = 0
-foreach ($FilteredRow in $FilteredCells.Rows) {
-    $RowCount++
-}
-$Notice = "The number of filtered rows is: '" + $RowCount + "'"
-[System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
-#endregion NUMBER OF FILTERED WORKSHEET ROWS
 
 # CLOSE WORKBOOK
 $WorkBook.Close($true) # Note: "$true" = Save file changes. "$false" = Do not save file changes.
