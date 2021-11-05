@@ -35,11 +35,13 @@ $xlCellTypeVisible = 12
 $Date = Get-Date -Format "yyyy-MM-dd"
 
 # EXCEL FILEPATH
-$Filename = "C:\Projects\PowerShell\Excel_Automation\Financial Sample"
-$FilenameExtension = "xlsx"
-$FilePath = $Filename + "." + $FilenameExtension
-$FileBackupPath = $Filename + ".bak" + "." + $FilenameExtension
-$FileModifiedPath = $Filename + " " + $Date + "." + $FilenameExtension
+$FileDirectory = "C:\Projects\PowerShell\Excel_Automation\"
+$Filename = "Financial Sample"
+$FilePath = $FileDirectory + $Filename + "." + "xlsx"
+$FilePathBackup = $FileDirectory + $Filename + ".bak" + "." + "xlsx"
+$FilePathModified = $FileDirectory + $Filename + " " + $Date + "." + "xlsx"
+$FilePathRetainedHeaders = $FileDirectory + $Filename + " - Headers" + "." + "csv"
+$FilePathFieldFilters = $FileDirectory + $Filename + " - Filters" + "." + "csv"
 
 # EXCEL WORKBOOK PASSWORD
 $WorkbookPassword = "password"
@@ -51,8 +53,15 @@ $WorksheetName = "Sheet1"
 $WorksheetModifiedName = "Modified"
 
 # COLUMNS IDENTIFIED FOR DELETION
-$DeleteColumnsArray = @("Discount Band", "Units Sold")
-$RetainedHeadersArray = @("Segment", "Country", "Product", "Date", "Month Number", "Month Name", "Year")
+# $DeleteColumnsArray = @("Discount Band", "Units Sold")
+
+# COLUMNS IDENTIFIED FOR RETENTION
+# $RetainedHeadersArray = @("Segment", "Country", "Product", "Date", "Month Number", "Month Name", "Year")
+$RetainedHeadersArray = Import-Csv -Path $FilePathRetainedHeaders -Delimiter ","
+
+# COLUMNS TO BE FILTERED
+# $FieldFiltersArray = Import-Csv -Path $FilePathFieldFilters -Delimiter ","
+$FieldFiltersArray = Get-Content -Path $FilePathFieldFilters
 
 
 # FUNCTIONS
@@ -79,24 +88,10 @@ function FindHeaderColumnIndex {
 #endregion FIND HEADER COLUMN INDEX
 
 
-# #region RETURN COLUMN CONTENTS
-# function ReturnColumnContents {
-#     param ($refColumnArray)
-
-#     $refColumnContentsArray = @()
-#     foreach ($refRowItem in $refColumnArray) {
-
-#     }
-
-
-#     return $refColumnContentsArray
-# }
-# #endregion RETURN COLUMN CONTENTS
-
-
 #region RETURN MATCHING ARRAY ITEMS
 function ReturnMatchingArrayItems {
-    param ($refArray, $refSearchString)
+    # param ($refArray, $refSearchString)
+    param ([string[]]$refArray, [string]$refSearchString)
 
     $refMatchingItemsArray = @()
     foreach ($refTextItem in $refArray) {
@@ -106,12 +101,19 @@ function ReturnMatchingArrayItems {
     }
     return $refMatchingItemsArray
 }
-#region RETURN MATCHING ARRAY ITEMS
+#endregion RETURN MATCHING ARRAY ITEMS
+
+
+#region RETAIN SPECIFIED COLUMNS
+# function RetainSpecifiedColumns {
+#     param ()
+# }
+#endregion RETAIN SPECIFIED COLUMNS
 
 
 # BACKUP FILE(S)
-# Copy-Item $FilePath -Destination $FileBackupPath -Force
-Copy-Item $FilePath -Destination $FileModifiedPath -Force
+# Copy-Item $FilePath -Destination $FilePathBackup -Force
+Copy-Item $FilePath -Destination $FilePathModified -Force
 
 # Note: The following is necessary for such things as "MessageBox".
 # Add-Type -AssemblyName System.Windows.Forms
@@ -126,7 +128,7 @@ $objExcel.Visible = $true
 
 # OPEN THE EXCEL FILE
 # $WorkBook = $objExcel.Workbooks.Open($FilePath)
-$WorkBook = $objExcel.Workbooks.Open($FileModifiedPath)
+$WorkBook = $objExcel.Workbooks.Open($FilePathModified)
 
 
 # $TestWorksheetCount = $WorkBook.Worksheets.Count
@@ -134,8 +136,8 @@ $WorkBook = $objExcel.Workbooks.Open($FileModifiedPath)
 
 # BACKUP WORKBOOK (WITH PASSWORD)
 $objExcel.DisplayAlerts = $false; # Note: "$false" = Do not prompt for confirmation to "over-write" backup file.
-# $WorkBook.SaveAs($FileBackupPath)
-$WorkBook.SaveAs($FileModifiedPath, [Type]::Missing, $WorkbookPassword)
+# $WorkBook.SaveAs($FilePathBackup)
+$WorkBook.SaveAs($FilePathModified, [Type]::Missing, $WorkbookPassword)
 
 
 # ADD NEW WORKSHEET TO WORKBOOK
@@ -159,7 +161,7 @@ $WorkBook.Worksheets[$WorksheetName].Activate()
 $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
 
 
-# #region DELETE SPECIFIED COLUMNS
+#region DELETE SPECIFIED COLUMNS
 # # Create array of column names to delete
 # foreach ($FieldName in $DeleteColumnsArray) {
 #     $ColumnIndex = 0
@@ -177,7 +179,7 @@ $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
 #         }
 #     }
 # }
-# #endregion DELETE SPECIFIED COLUMNS
+#endregion DELETE SPECIFIED COLUMNS
 
 
 #region RETAIN SPECIFIED COLUMNS
@@ -188,7 +190,8 @@ while ($ColumnIndex -le $FieldCount) {
     $Column = $WorkSheet.UsedRange.Rows(1).Cells[$ColumnIndex]
     $ColumnText = $Column.Text
 
-    if ($RetainedHeadersArray -match $ColumnText) {
+    # if ($RetainedHeadersArray -match $ColumnText) {
+    if ($RetainedHeadersArray.Header -match $ColumnText) {
         # $ResponseText = "Field Header: '" + $ColumnText + "' should be retained."
         $ColumnIndex++
     }
@@ -236,94 +239,84 @@ $HeaderRowArray = $WorkSheet.UsedRange.Rows(1).Cells
 #endregion FIND HEADER COLUMN COUNT
 
 
+
+
+
+
+
+
+
+
+
+
 #region APPLY AUTOFILTER
-# FIND HEADER COLUMN INDEX
-$FilterFieldName = "Country"
-$FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterFieldName
+foreach ($Record in $FieldFiltersArray) {
+    # CLEAR AUTOFILTER CRITERIA
+    [string[]]$FilterCriteriaArray = @()
 
+    # CLEAR COLUMN CONTENTS
+    $ColumnContentsArray = @()
 
-# FIND COLUMN CONTENTS
-$ColumnContentsArray = @()
-# $ColumnContentsArray = $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells
-foreach ($Cell in $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells) {
-    $ColumnContentsArray += $Cell.Text
+    $FilterArray = $Record.Split(",")
+    for ($intCriteriaCounter=0; $intCriteriaCounter -lt $FilterArray.Length; $intCriteriaCounter++) {
+        $FilterItem = $FilterArray[$intCriteriaCounter]
+        if (-not ([string]::IsNullOrWhiteSpace($FilterItem))) {
+            if ($intCriteriaCounter -eq 0) {
+                # FIND HEADER COLUMN INDEX
+                $FilterFieldName = $FilterItem
+                $FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterFieldName
+
+                # FIND COLUMN CONTENTS
+                $ColumnContentsArray = @()
+                $ColumnContentsArray = $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells
+                # foreach ($Cell in $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells) {
+                #     $ColumnContentsArray += $Cell.Text
+                # }
+
+                $ColumnTextArray = @()
+                # $ColumnContentsTotalCount = $ColumnContentsArray.Count
+                for ($intCellCounter=2; $intCellCounter -le $ColumnContentsArray.Count; $intCellCounter++) {
+                    $ColumnTextArray += $ColumnContentsArray[$intCellCounter].Text
+                }
+
+                # DE-DUPE AND SORT
+                $ColumnTextArray = $ColumnTextArray | Sort-Object -Unique
+            }
+            else {
+                # SEARCH ARRAY
+                $SearchString = $FilterItem # Example: "Can*"
+                $MatchingArrayItems = @()
+                # $MatchingArrayItems = ReturnMatchingArrayItems $ColumnContentsArray $SearchString
+                $MatchingArrayItems = ReturnMatchingArrayItems $ColumnTextArray $SearchString
+
+                # DE-DUPE AND SORT
+                # $MatchingArrayItems = $MatchingArrayItems | Sort-Object -Unique
+
+                # ADD TO AUTOFILTER CRITERIA
+                $FilterCriteriaArray += $MatchingArrayItems
+            }
+        }
+        else {
+            # ERROR
+        }
+    }
+
+    # APPLY AUTOFILTER
+    $WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
 }
-
-
-# AUTOFILTER CRITERIA
-$SearchString = "Franc*"
-$MatchingArrayItems = @()
-$MatchingArrayItems = ReturnMatchingArrayItems $ColumnContentsArray $SearchString
-
-
-# DE-DUPE AND SORT
-$MatchingArrayItems = $MatchingArrayItems | Sort-Object -Unique
-
-
-# AUTOFILTER CRITERIA
-$FilterCriteriaArray = @()
-$FilterCriteriaArray += $MatchingArrayItems
-$WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
 #endregion APPLY AUTOFILTER
 
 
 
 
 
-#region APPLY AUTOFILTER
-# FIND HEADER COLUMN INDEX
-$FilterFieldName = "Country"
-$FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterFieldName
 
 
-# AUTOFILTER CRITERIA
-$FilterCriteriaArray = @()
-$FilterCriteriaArray += "=France"
-$FilterCriteriaArray += "=Germany"
-$WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
-#endregion APPLY AUTOFILTER
 
 
-#region APPLY AUTOFILTER
-# FIND HEADER COLUMN INDEX
-$FilterFieldName = "Product"
-$FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterFieldName
 
 
-# AUTOFILTER CRITERIA
-$FilterCriteriaArray = @()
-$FilterCriteriaArray += "=Paseo"
-$FilterCriteriaArray += "=Velo"
-$WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
-#endregion APPLY AUTOFILTER
 
-
-#region APPLY AUTOFILTER
-# FIND HEADER COLUMN INDEX
-$FilterFieldName = "Month Number"
-$FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterFieldName
-
-
-# AUTOFILTER CRITERIA
-$FilterCriteriaArray = @()
-$FilterCriteriaArray += "=6"
-$FilterCriteriaArray += "=10"
-$WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
-#endregion APPLY AUTOFILTER
-
-
-#region APPLY AUTOFILTER
-# FIND HEADER COLUMN INDEX
-$FilterFieldName = "Year"
-$FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterFieldName
-
-
-# AUTOFILTER CRITERIA
-$FilterCriteriaArray = @()
-$FilterCriteriaArray += "=2013*"
-$FilterCriteriaArray += "=2014"
-$WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
-#endregion APPLY AUTOFILTER
 
 
 #region SELECT ALL FILTERED CELLS
