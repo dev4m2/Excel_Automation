@@ -1,6 +1,9 @@
 # [x]TODO: Create Counter Loop for Filtered Rows.
 # [ ]TODO: Create "Log File" function.
 # [ ]TODO: Create "FindHeaderColumnIndex" function.
+# [x]TODO: Adjust for optional password.
+# [ ]TODO: Allow wildcard (i.e. "*") for headers retention.
+# [ ]TODO: Allow criteria filtering on "blanks".
 
 
 # RESOURCES
@@ -44,10 +47,7 @@ $FilePathRetainedHeaders = $FileDirectory + $Filename + " - Headers" + "." + "cs
 $FilePathFieldFilters = $FileDirectory + $Filename + " - Filters" + "." + "csv"
 
 # EXCEL WORKBOOK PASSWORD
-$WorkbookPassword = "password"
-
-# EXCEL PRIMARY WORKSHEET NAME
-# $WorksheetName = "Sheet1"
+$WorkbookPassword = ""
 
 # EXCEL WORKSHEET OBJECT
 $WorkSheet = $null
@@ -97,7 +97,13 @@ function ReturnMatchingArrayItems {
 
     $refMatchingItemsArray = @()
     foreach ($refTextItem in $refArray) {
-        if ($refTextItem -Like $refSearchString) {
+        if ($refSearchString -eq '""') { # Is search string empty?
+            if ([string]::IsNullOrWhiteSpace($refTextItem)) { # Filter on blank cells.
+                $refMatchingItemsArray += "="
+                break
+            }
+        }
+        elseif ($refTextItem -Like $refSearchString) { # Filter on wildcards.
             $refMatchingItemsArray += $refTextItem
         }
     }
@@ -125,9 +131,11 @@ $objExcel.Visible = $true
 $WorkBook = $objExcel.Workbooks.Open($FilePathModified)
 
 # BACKUP WORKBOOK (WITH PASSWORD)
-$objExcel.DisplayAlerts = $false; # Note: "$false" = Do not prompt for confirmation to "over-write" backup file.
-# $WorkBook.SaveAs($FilePathBackup)
-$WorkBook.SaveAs($FilePathModified, [Type]::Missing, $WorkbookPassword)
+if (-not ([string]::IsNullOrWhiteSpace($WorkbookPassword))) {
+    $objExcel.DisplayAlerts = $false; # Note: "$false" = Do not prompt for confirmation to "over-write" backup file.
+    $WorkBook.SaveAs($FilePathModified, [Type]::Missing, $WorkbookPassword)
+    $objExcel.DisplayAlerts = $true; # Note: "$true" = Prompt for confirmation to "over-write" backup file.
+}
 
 
 #region DELETE SPECIFIED COLUMNS
@@ -153,7 +161,7 @@ $WorkBook.SaveAs($FilePathModified, [Type]::Missing, $WorkbookPassword)
 
 #region CELL VALUE
 # $CellValue = $WorkSheet.Cells[1, 2].Text
-# $Notice = "The cell value is: '" + $CellValue + "'"
+# $Notice = "Cell value: '" + $CellValue + "'"
 # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
 #endregion CELL VALUE
 
@@ -229,69 +237,76 @@ for ($intRecordCounter=1; $intRecordCounter -lt $FieldFiltersArray.Count; $intRe
                         # $WorkBook.Worksheets.Add([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$intWorksheetCount], 1, $WorkBook.Worksheets[1].Type)
 
                         # COPY PRIMARY WORKSHEET (TO LAST POSITION)
-                        # $WorkBook.Worksheets[$WorksheetName].Copy([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$intWorksheetCount])
                         $WorkBook.Worksheets[1].Copy([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$intWorksheetCount])
 
                         # RENAME WORKSHEET (IN LAST POSITION)
                         $WorkBook.Worksheets[$intWorksheetCount + 1].Name = $NewWorksheetName
 
                         # ACTIVATE WORKSHEET
-                        # $WorkBook.Worksheets[$WorksheetName].Activate()
                         $WorkBook.Worksheets[$NewWorksheetName].Activate()
 
                         # SET REFERENCE TO WORKSHEET OBJECT
-                        # $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
                         $WorkSheet = $WorkBook.Worksheets[$NewWorksheetName]
 
                         #region NUMBER OF ROWS IN WORKSHEET
                         $RowCount = 0
                         $RowCount = $WorkSheet.UsedRange.Rows.Count - 1
-                        $Notice = "The total number of rows is: '" + $RowCount + "'"
-                        [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+                        $Notice = "Number of original rows: '" + $RowCount + "'"
+                        # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+                        Write-Output ""
+                        Write-Output $Notice
                         #endregion NUMBER OF ROWS IN WORKSHEET
 
                         #region RETAIN SPECIFIED COLUMNS
-                        $ColumnIndex = 1
-                        $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
-
-                        while ($ColumnIndex -le $FieldCount) {
-                            $Column = $WorkSheet.UsedRange.Rows(1).Cells[$ColumnIndex]
-                            $ColumnText = $Column.Text
-
-                            # if ($RetainedHeadersArray -match $ColumnText) {
-                            if ($RetainedHeadersArray.Header -match $ColumnText) {
-                                # $ResponseText = "Field Header: '" + $ColumnText + "' should be retained."
-                                $ColumnIndex++
+                        if (-not ($RetainedHeadersArray.Header[0] -eq "*")) {
+                            $ColumnIndex = 1
+                            $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
+    
+                            while ($ColumnIndex -le $FieldCount) {
+                                $Column = $WorkSheet.UsedRange.Rows(1).Cells[$ColumnIndex]
+                                $ColumnText = $Column.Text
+    
+                                # if ($RetainedHeadersArray -match $ColumnText) {
+                                if ($RetainedHeadersArray.Header -match $ColumnText) {
+                                    # $ResponseText = "Field Header: '" + $ColumnText + "' should be retained."
+                                    $ColumnIndex++
+                                }
+                                else {
+                                    # $ResponseText = "Field Header: '" + $ColumnText + "' should be DELETED."
+                                    $WorkSheet.Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
+                                    $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
+                                }
+                                # Write-Output $ResponseText
                             }
-                            else {
-                                # $ResponseText = "Field Header: '" + $ColumnText + "' should be DELETED."
-                                $WorkSheet.Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
-                                $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
-                            }
-                            # Write-Output $ResponseText
                         }
                         #endregion RETAIN SPECIFIED COLUMNS
 
-                        # GET HEADER ROW ARRAY
+                        # POPULATE HEADER ROW ARRAY
                         $HeaderRowArray = $WorkSheet.UsedRange.Rows(1).Cells
                     }
                 }
 
                 1 {
                     # CLEAR COLUMN CONTENTS
-                    $ColumnContentsArray = @()
+                    # $ColumnContentsArray = @()
 
                     # FIND HEADER COLUMN INDEX
-                    $FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterItem # Example: "Country = 2nd column"
+                    # $FilterFieldIndex = FindHeaderColumnIndex $HeaderRowArray $FilterItem # Example: "Country = 2nd column"
+                    # $FilterFieldIndex = $WorkSheet.UsedRange.Columns.Find("Country").Column # Example: "Country = 2nd column"
+                    $FilterFieldIndex = $WorkSheet.UsedRange.Columns.Find($FilterItem).Column # Example: "Country = 2nd column"
 
                     # FIND COLUMN CONTENTS
-                    $ColumnContentsArray = $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells # Example: 700 rows
+                    # $ColumnContentsArray = $WorkSheet.UsedRange.Columns($FilterFieldIndex).Cells # Example: 700 rows
 
                     # POPULATE COLUMN TEXT ARRAY WITH COLUMN CONTENTS (TEXT VALUES)
                     # Note: Start with 2nd item in array (i.e. Exclude the column header name).
-                    for ($intCellCounter=2; $intCellCounter -le $ColumnContentsArray.Count; $intCellCounter++) {
-                        $ColumnTextArray += $ColumnContentsArray[$intCellCounter].Text
-                    }
+                    # for ($intCellCounter=2; $intCellCounter -le $ColumnContentsArray.Count; $intCellCounter++) {
+                    #     $ColumnTextArray += $ColumnContentsArray[$intCellCounter].Text
+                    # }
+
+                    # POPULATE COLUMN TEXT ARRAY WITH COLUMN CONTENTS
+                    $ColumnTextArray = $WorkSheet.UsedRange.Rows.Columns[$FilterFieldIndex].Value2
+                    $ColumnTextArray = $ColumnTextArray | Select-Object -skip 1 # Ignore Header
 
                     # DE-DUPE AND SORT
                     # Note: Cannot sort "$ColumnContentsArray" as it contains objects and not just text.
@@ -327,8 +342,10 @@ for ($intRecordCounter=1; $intRecordCounter -lt $FieldFiltersArray.Count; $intRe
     foreach ($FilteredRow in $FilteredCells.Rows) {
         $FilteredRowCount++
     }
-    $Notice = "The number of filtered rows is: '" + $FilteredRowCount + "'"
-    [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+    $Notice = "Number of filtered rows: '" + $FilteredRowCount + "'"
+    # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+    Write-Output ""
+    Write-Output $Notice
     #endregion NUMBER OF FILTERED WORKSHEET ROWS
 }
 #endregion APPLY AUTOFILTER
