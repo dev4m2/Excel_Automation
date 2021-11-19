@@ -30,3 +30,10 @@ C:\Projects\PowerShell\Excel_Automation\Excel_Automation_Examples.ps1
 
 PowerShell (i.e. wget):
 Invoke-WebRequest -Uri "https://github.com/dev4m2/Excel_Automation/raw/main/Excel_Automation_Examples.ps1" -OutFile "C:\Projects\PowerShell\Excel_Automation\Excel_Automation_Examples.ps1"
+
+
+Download the Financial Sample Excel workbook for Power BI
+https://docs.microsoft.com/en-us/power-bi/create-reports/sample-financial-download
+
+Country Names And Country Codes Reference Lists
+https://home.treasury.gov/data/treasury-international-capital-tic-system-home-page/using-tic/country-names-and-country-codes-reference-lists

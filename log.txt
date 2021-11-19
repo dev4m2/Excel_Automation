@@ -1,0 +1,30 @@
+
+Country
+Start For Loop
+11/17/2021 08:45:11 AM
+End For Loop
+11/17/2021 08:45:27 AM
+Start ForEach
+11/17/2021 08:45:27 AM
+End ForEach
+11/17/2021 08:45:32 AM
+
+Product
+Start For Loop
+11/17/2021 08:45:33 AM
+End For Loop
+11/17/2021 08:45:48 AM
+Start ForEach
+11/17/2021 08:45:48 AM
+End ForEach
+11/17/2021 08:45:50 AM
+
+Date
+Start For Loop
+11/17/2021 08:45:53 AM
+End For Loop
+11/17/2021 08:46:06 AM
+Start ForEach
+11/17/2021 08:46:06 AM
+End ForEach
+11/17/2021 08:46:08 AM
