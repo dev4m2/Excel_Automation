@@ -29,29 +29,62 @@ $xlFilterIcon = 10
 $xlFilterDynamic = 11
 
 
-# xlCellType ENUMERATION CONSTANTS (EXCEL)
+# CELL TYPE CONSTANTS
 $xlCellTypeLastCell = 11
 $xlCellTypeVisible = 12
 
 
+# WORKSHEET TYPES
+$xlChart = -4109
+$xlDialogSheet = -4116
+$xlExcel4IntlMacroSheet = 4
+$xlExcel4MacroSheet = 3
+$xlWorksheet = -4167
+
+
+# PASTE TYPES
+$xlPasteAll = -4104                         # Everything will be pasted.
+$xlPasteAllExceptBorders = 7                # Everything except borders will be pasted.
+$xlPasteAllMergingConditionalFormats = 14   # Everything will be pasted and conditional formats will be merged.
+$xlPasteAllUsingSourceTheme = 13            # Everything will be pasted using the source theme.
+$xlPasteColumnWidths = 8                    # Copied column width is pasted.
+$xlPasteComments = -4144                    # Comments are pasted.
+$xlPasteFormats = -4122                     # Copied source format is pasted.
+$xlPasteFormulas = -4123                    # Formulas are pasted.
+$xlPasteFormulasAndNumberFormats = 11       # Formulas and Number formats are pasted.
+$xlPasteValidation = 6                      # Validations are pasted.
+$xlPasteValues = -4163                      # Values are pasted.
+$xlPasteValuesAndNumberFormats = 12         # Values and Number formats are pasted.
+
+
+# PASTE SPECIAL OPERATIONS
+$xlPasteSpecialOperationAdd = 2             # Copied data will be added with the value in the destination cell.
+$xlPasteSpecialOperationDivide = 5          # Copied data will be divided with the value in the destination cell.
+$xlPasteSpecialOperationMultiply = 4        # Copied data will be multiplied with the value in the destination cell.
+$xlPasteSpecialOperationNone = -4142        # No calculation will be done in the paste operation.
+$xlPasteSpecialOperationSubtract = 3        # Copied data will be subtracted with the value in the destination cell.
+
+
 # CELL COLORS
 $ColorTable = @{
-    Black = 1;
-    White = 2;
-    Red = 3;
-    Lime = 4;
-    Blue = 5;
-    Yellow = 6;
-    Fuchsia = 7;
-    Aqua = 8;
-    Maroon = 9;
-    Green = 10;
-    Navy = 11;
-    Olive = 12;
-    Purple = 13;
-    Teal = 14;
-    Silver = 15;
-    Gray = 16
+    Black = "255,0,0,0";
+    White = "255,255,255,255";
+    Red = "255,255,0,0";
+    Lime = "255,0,255,0";
+    Blue = "255,0,0,255";
+    Yellow = "255,255,255,0";
+    Fuchsia = "255,255,0,255";
+    Aqua = "255,0,255,255";
+    Maroon = "255,128,0,0";
+    Green = "255,0,128,0";
+    Navy = "255,0,0,128";
+    Olive = "255,128,128,0";
+    Purple = "255,128,0,128";
+    Teal = "255,0,128,128";
+    Silver = "255,192,192,192";
+    Gray = "255,128,128,128";
+    LimeGreen = "255,50,205,50";
+    PeachPuff = "255,255,218,185"
 }
 
 
@@ -63,8 +96,8 @@ function ReturnMatchingArrayItems {
     $refMatchingItemsArray = @()
     
     foreach ($refTextItem in $refArray) {
-        # if ($refSearchString -eq '""') { # Is search string empty?
-        if ($refSearchString -eq '""""') { # Is search string empty? (Note: This works for both Excel and Notepad.)
+        if ($refSearchString -eq '""') { # Is search string empty?
+        # if ($refSearchString -eq '""""') { # Is search string empty? (Note: This works for both Excel and Notepad.)
             if ([string]::IsNullOrWhiteSpace($refTextItem)) { # Filter on blank cells.
                 $refMatchingItemsArray += "="
                 break
@@ -96,25 +129,19 @@ $FilePathActionItems = $FileDirectory + $Filename + " - Actions" + "." + "csv"
 # EXCEL WORKBOOK PASSWORD
 $WorkbookPassword = ""
 
-# EXCEL WORKSHEET OBJECT
-$WorkSheet = $null
-
 # WORKSHEET NAME
-$PreviousWorksheetName = ""
+$WorksheetName = ""
 
 # FILTERED CELL ARRAY
 $FilteredCells = $null
-
-# COLUMNS IDENTIFIED FOR DELETION
-# $DeleteColumnsArray = @("Discount Band", "Units Sold")
 
 # COLUMNS IDENTIFIED FOR RETENTION
 # $RetainedHeadersArray = @("Header", "Segment", "Country", "Product", "Date", "Month Number", "Month Name", "Year")
 $RetainedHeadersArray = Import-Csv -Path $FilePathRetainedHeaders -Delimiter ","
 
-# COLUMNS TO BE FILTERED
-$ActionItemsArray = Get-Content -Path $FilePathActionItems
-
+# ACTION ITEMS FILE
+# $RecordsArray = Get-Content -Path $FilePathActionItems
+$RecordsArray = Import-Csv -Path $FilePathActionItems -Delimiter ","
 
 # BACKUP FILE(S)
 # Copy-Item $FilePath -Destination $FilePathBackup -Force
@@ -134,33 +161,57 @@ $objExcel.Visible = $true
 # $WorkBook = $objExcel.Workbooks.Open($FilePath)
 $WorkBook = $objExcel.Workbooks.Open($FilePathModified)
 
-# BACKUP WORKBOOK (WITH PASSWORD)
+
+#region BACKUP WORKBOOK (WITH PASSWORD)
 if (-not ([string]::IsNullOrWhiteSpace($WorkbookPassword))) {
     $objExcel.DisplayAlerts = $false; # Note: "$false" = Do not prompt for confirmation to "over-write" backup file.
     $WorkBook.SaveAs($FilePathModified, [Type]::Missing, $WorkbookPassword)
     $objExcel.DisplayAlerts = $true; # Note: "$true" = Prompt for confirmation to "over-write" backup file.
 }
+#endregion BACKUP WORKBOOK (WITH PASSWORD)
 
 
-#region CELL VALUE
-# $CellValue = $WorkSheet.Cells[1, 2].Text
-# $Notice = "Cell value: '" + $CellValue + "'"
+#region REMOVE UNIDENTIFIED COLUMNS
+if (-not ($RetainedHeadersArray.Header[0] -eq "*")) {
+    $ColumnIndex = 1
+    # $FieldCount = $WorkBook.Worksheets[1].UsedRange.Rows(1).Cells.Count
+    $FieldCount = $WorkBook.Worksheets[1].UsedRange.Rows(1).Columns.Count
+
+    while ($ColumnIndex -le $FieldCount) {
+        # $FieldCell = $WorkBook.Worksheets[1].UsedRange.Rows(1).Cells[$ColumnIndex]
+        $FieldCell = $WorkBook.Worksheets[1].UsedRange.Rows(1).Columns[$ColumnIndex].Cells
+        $ColumnText = $FieldCell.Text
+
+        # if ($RetainedHeadersArray -match $ColumnText) {
+        if ($RetainedHeadersArray.Header -match $ColumnText) {
+            # $ResponseText = "Field Header: '" + $ColumnText + "' should be retained."
+            $ColumnIndex++
+        }
+        else {
+            # $ResponseText = "Field Header: '" + $ColumnText + "' should be DELETED."
+            $WorkBook.Worksheets[1].Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
+            # $FieldCount = $WorkBook.Worksheets[1].UsedRange.Rows(1).Cells.Count
+            $FieldCount = $WorkBook.Worksheets[1].UsedRange.Rows(1).Columns.Count
+        }
+        # Write-Output $ResponseText
+    }
+}
+#endregion REMOVE UNIDENTIFIED COLUMNS
+
+
+#region NUMBER OF ROWS IN WORKSHEET
+$RowCount = 0
+$RowCount = $WorkBook.Worksheets[1].UsedRange.Rows.Count - 1
+$Notice = "Number of original rows: '" + $RowCount + "'"
 # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
-#endregion CELL VALUE
-
-
-#region MODIFY CELL VALUE
-# $WorkSheet.Cells[3, 2].Value = "Columbia"
-#endregion MODIFY CELL VALUE
+Write-Output ""
+Write-Output $Notice
+#endregion NUMBER OF ROWS IN WORKSHEET
 
 
 #region LOOP THROUGH ACTION ITEMS
 # READ EACH RECORD INTO ARRAY
-# Note: Start with 2nd item in array (i.e. Exclude the column header name).
-for ($intRecordCounter=1; $intRecordCounter -lt $ActionItemsArray.Count; $intRecordCounter++) {
-    $ActionRecord = ""
-    $ActionRecord = $ActionItemsArray[$intRecordCounter]
-
+for ($intRecordCounter = 0; $intRecordCounter -lt $RecordsArray.Count; $intRecordCounter++) {
     # CLEAR AUTOFILTER CRITERIA
     [string[]]$FilterCriteriaArray = @()
 
@@ -173,339 +224,232 @@ for ($intRecordCounter=1; $intRecordCounter -lt $ActionItemsArray.Count; $intRec
     # CLEAR FILTER FIELD INDEX
     $FilterFieldIndex = 0
 
-    # PARSE EACH ROW ITEM (FROM THE FILTERS FILE)
-    $ActionArray = @()
-    $ActionArray = $ActionRecord.Split(',')
+    $WorksheetName = $RecordsArray.Worksheet[$intRecordCounter]
 
-    # REMOVE EMPTY ARRAY ITEMS
-    $TrimmedFilterArray = @()
-    foreach ($Item in $ActionArray) {
-        if (-not ([string]::IsNullOrWhiteSpace($Item))) {
-            $TrimmedFilterArray += $Item
-        }
-    }
+    $Action = $RecordsArray.Action[$intRecordCounter]
 
-    # POPULATE ACTION ARRAY (NO EMPTY ITEMS)
-    $ActionArray = @()
-    $ActionArray += $TrimmedFilterArray
+    $Field = $RecordsArray.Field[$intRecordCounter]
 
-    # WORKSHEET NAME
-    $WorksheetName = ""
+    $Criteria = $RecordsArray.Criteria[$intRecordCounter]
+    # $Criteria = $RecordsArray.Criteria[$intRecordCounter].Trim('"').TrimStart('[').TrimEnd(']')
 
-    # LOOP THROUGH ACTION ITEM ARRAY
-    for ($intFieldCounter=0; $intFieldCounter -lt $ActionArray.Length; $intFieldCounter++) {
-        # GET ACTION ITEM (FROM THE FILTERS FILE)
-        $ActionItem = ""
-        $ActionItem = $ActionArray[$intFieldCounter] # Example: "Country,Can*,Franc*,Germ*"
 
-        switch ($intFieldCounter) 
-        {
-            0 { # WORKSHEET
-                if ($PreviousWorksheetName -ne $ActionItem) {
-                    $WorksheetExists = $false
+    # REMOVE SURROUNDING QUOTATION MARKS
+    $Criteria = $Criteria.Trim('"')
 
-                    # WORKSHEET NAME
-                    # $WorksheetName = ""
-                    $WorksheetName = $ActionItem
-                    $PreviousWorksheetName = $ActionItem
-    
-                    # DOES WORKSHEET EXIST?
-                    foreach ($WorksheetTab in $WorkBook.Worksheets) {
-                        if ($WorksheetTab.Name -eq $WorksheetName) {
-                            $WorksheetExists = $true
-                            break
-                        }
-                    }
-    
-                    # SELECT EXISTING WORKSHEET
-                    if ($WorksheetExists -eq $true) {
-                        # ACTIVATE WORKSHEET
-                        $WorkBook.Worksheets[$WorksheetName].Activate()
-    
-                        # SET REFERENCE TO WORKSHEET OBJECT
-                        $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
-    
-                        #region NUMBER OF ROWS IN WORKSHEET
-                        $RowCount = 0
-                        $RowCount = $WorkSheet.UsedRange.Rows.Count - 1
-                        $Notice = "Number of original rows: '" + $RowCount + "'"
-                        # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
-                        Write-Output ""
-                        Write-Output $Notice
-                        #endregion NUMBER OF ROWS IN WORKSHEET
-    
-                        #region REMOVE UNIDENTIFIED COLUMNS
-                        if (-not ($RetainedHeadersArray.Header[0] -eq "*")) {
-                            $ColumnIndex = 1
-                            $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
-    
-                            while ($ColumnIndex -le $FieldCount) {
-                                $Column = $WorkSheet.UsedRange.Rows(1).Cells[$ColumnIndex]
-                                $ColumnText = $Column.Text
-    
-                                # if ($RetainedHeadersArray -match $ColumnText) {
-                                if ($RetainedHeadersArray.Header -match $ColumnText) {
-                                    # $ResponseText = "Field Header: '" + $ColumnText + "' should be retained."
-                                    $ColumnIndex++
-                                }
-                                else {
-                                    # $ResponseText = "Field Header: '" + $ColumnText + "' should be DELETED."
-                                    $WorkSheet.Columns[$ColumnIndex].EntireColumn.Delete() # Prints "True" if successful.
-                                    $FieldCount = $WorkSheet.UsedRange.Rows(1).Cells.Count
-                                }
-                                # Write-Output $ResponseText
-                            }
-                        }
-                        #endregion REMOVE UNIDENTIFIED COLUMNS
-                    }
-                    else {
-                        # ADD NEW WORKSHEET
-                        # $WorkBook.Worksheets.Add()
-    
-                        # NUMBER OF WORKSHEETS IN WORKBOOK
-                        # $intWorksheetCount = 0
-                        # $intWorksheetCount = $WorkBook.Worksheets.Count
-    
-                        # # ADD NEW WORKSHEET TO WORKBOOK
-                        # # $WorkBook.Worksheets.Add($WorksheetName)
-                        # # $WorkBook.Worksheets.Add([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$intWorksheetCount], 1, $WorkBook.Worksheets[1].Type)
-    
-                        # # COPY PRIMARY WORKSHEET (TO LAST POSITION)
-                        # $WorkBook.Worksheets[1].Copy([System.Reflection.Missing]::Value, $WorkBook.Worksheets[$intWorksheetCount])
-    
-                        # RENAME WORKSHEET (IN LAST POSITION)
-                        # $WorkBook.Worksheets[$intWorksheetCount + 1].Name = $WorksheetName
-    
-                        # # ACTIVATE WORKSHEET
-                        # $WorkBook.Worksheets[$WorksheetName].Activate()
-    
-                        # # SET REFERENCE TO WORKSHEET OBJECT
-                        # $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
-                    }
-                }
-                break
+    # REMOVE LEADING BRACKET
+    $Criteria = $Criteria.TrimStart('[')
+
+    # REMOVE TRAILING BRACKET
+    $Criteria = $Criteria.TrimEnd(']')
+
+    $CriteriaArray = @()
+    $CriteriaArray = $Criteria.Split('|')
+
+
+    switch ($Action) {
+        "FILTER-TEXT" {
+            # FIND HEADER COLUMN INDEX
+            $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Columns.Find($Field).Column # Example: "Country = 2nd column"
+
+            # Add-Content log.txt -Value ""
+            # Add-Content log.txt -Value $Field
+
+            # Add-Content log.txt -Value "Start ForEach"
+            # $Timestamp = $(Get-Date -Format "MM/dd/yyyy hh:mm:ss tt").ToString()
+            # Add-Content log.txt -Value $Timestamp
+
+            # POPULATE COLUMN TEXT ARRAY WITH COLUMN CONTENTS
+            $ColumnTextArray = $WorkBook.Worksheets[$WorksheetName].UsedRange.Rows.Columns[$FilterFieldIndex].Cells | ForEach-Object { $_.Text }
+
+            # Add-Content log.txt -Value "End ForEach"
+            # $Timestamp = $(Get-Date -Format "MM/dd/yyyy hh:mm:ss tt").ToString()
+            # Add-Content log.txt -Value $Timestamp
+
+            # REMOVE HEADER COLUMN FROM ARRAY
+            $ColumnTextArray = $ColumnTextArray | Select-Object -skip 1
+
+            # DE-DUPE AND SORT
+            $ColumnTextArray = $ColumnTextArray | Sort-Object -Unique # Example: 8 rows
+            
+            $MatchingArrayItems = @()
+            foreach ($CriteriaItem in $CriteriaArray) {
+                # SEARCH FIELD ARRAY
+                $MatchingArrayItems = ReturnMatchingArrayItems $ColumnTextArray $CriteriaItem # Example: Filter = "Can*; Result = "Canada"
+
+                # ADD TO AUTOFILTER CRITERIA
+                $FilterCriteriaArray += $MatchingArrayItems
             }
-
-            1 { # ACTION
-                $Action = $ActionItem
-
-                switch ($Action) {
-                    "FILTER-TEXT" {
-                        break
-                    }
-
-                    "FILTER-COLOR" {
-                        break
-                    }
-
-                    "FILTER-CLEAR" {
-                        break
-                    }
-
-                    "SORT" {
-                        break
-                    }
-
-                    "COLORIZE" {
-                        break
-                    }
-
-                    "COPY-PASTE" {
-                        break
-                    }
-
-                    Default {
-
-                    }
-                }
-                break
-            }
-
-            2 { # FIELD
-                $Field = $ActionItem
-
-                switch ($Action) {
-                    "FILTER-TEXT" {
-                        # FIND HEADER COLUMN INDEX
-                        $FilterFieldIndex = $WorkSheet.UsedRange.Columns.Find($Field).Column # Example: "Country = 2nd column"
-
-                        # Add-Content log.txt -Value ""
-                        # Add-Content log.txt -Value $Field
-
-                        # Add-Content log.txt -Value "Start ForEach"
-                        # $Timestamp = $(Get-Date -Format "MM/dd/yyyy hh:mm:ss tt").ToString()
-                        # Add-Content log.txt -Value $Timestamp
-
-                        # POPULATE COLUMN TEXT ARRAY WITH COLUMN CONTENTS
-                        $ColumnTextArray = $WorkSheet.UsedRange.Rows.Columns[$FilterFieldIndex].Cells | ForEach-Object { $_.Text }
-
-                        # Add-Content log.txt -Value "End ForEach"
-                        # $Timestamp = $(Get-Date -Format "MM/dd/yyyy hh:mm:ss tt").ToString()
-                        # Add-Content log.txt -Value $Timestamp
-
-                        # REMOVE HEADER COLUMN FROM ARRAY
-                        $ColumnTextArray = $ColumnTextArray | Select-Object -skip 1
-
-                        # DE-DUPE AND SORT
-                        $ColumnTextArray = $ColumnTextArray | Sort-Object -Unique # Example: 8 rows
-                        break
-                    }
-
-                    "FILTER-COLOR" {
-                        break
-                    }
-
-                    "FILTER-CLEAR" {
-                        break
-                    }
-
-                    "SORT" {
-                        break
-                    }
-
-                    "COLORIZE" {
-                        if ($Field -eq "*") { # Note: "*" represents all columns.
-                            $FilterFieldIndex = -1
-                        }
-                        break
-                    }
-
-                    "COPY-PASTE" {
-                        break
-                    }
-
-                    Default {
-
-                    }
-                }
-                break
-            }
-
-            3 { # CRITERIA
-                $Criteria = $ActionItem
-
-                # REMOVE SURROUNDING QUOTATION MARKS
-                $Criteria = $Criteria.Trim('"')
-
-                # REMOVE LEADING BRACKET
-                $Criteria = $Criteria.TrimStart('[')
-
-                # REMOVE TRAILING BRACKET
-                $Criteria = $Criteria.TrimEnd(']')
-
-                $CriteriaArray = @()
-                $CriteriaArray = $Criteria.Split('|')
-
-                switch ($Action) {
-                    "FILTER-TEXT" {
-                        $MatchingArrayItems = @()
-                        foreach ($CriteriaItem in $CriteriaArray) {
-                            # SEARCH FIELD ARRAY
-                            $MatchingArrayItems = ReturnMatchingArrayItems $ColumnTextArray $CriteriaItem # Example: Filter = "Can*; Result = "Canada"
-
-                            # ADD TO AUTOFILTER CRITERIA
-                            $FilterCriteriaArray += $MatchingArrayItems
-                        }
-                    
-                        # APPLY AUTOFILTER
-                        $WorkSheet.UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints number of records found.
-
-                        # SELECT ALL FILTERED CELLS
-                        # Note: "SpecialCells" returns a non-contiguous range. You must loop through each area.
-                        # $FilteredCells = $null
-                        $FilteredCells = $WorkSheet.AutoFilter.Range.SpecialCells($xlCellTypeVisible)
-                        $FilteredCells.Select() # Prints "True" if successful.
-
-                        #region NUMBER OF FILTERED WORKSHEET ROWS
-                        $FilteredRowCount = -1
-                        foreach ($FilteredRow in $FilteredCells.Rows) {
-                            $FilteredRowCount++
-                        }
-                        $Notice = "Number of filtered rows: '" + $FilteredRowCount + "'"
-                        # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
-                        Write-Output ""
-                        Write-Output $Notice
-                        #endregion NUMBER OF FILTERED WORKSHEET ROWS
-                        break
-                    }
-
-                    "FILTER-COLOR" {
-                        break
-                    }
-
-                    "FILTER-CLEAR" {
-                        break
-                    }
-
-                    "SORT" {
-                        break
-                    }
-
-                    "COLORIZE" {
-                        # USE FILL COLOR FOR FILTERED CELLS
-                        if ($FilterFieldIndex -eq -1) { # Note: "-1" represents all columns.
-                            foreach ($FilteredRow in $FilteredCells.Rows) {
-                                if ($FilteredRow.Row -gt 1) { # Skip header row
-                                    # $FilteredRow.Interior.ColorIndex = $yellow # Yellow = 6
-                                    $FilteredRow.Interior.ColorIndex = $ColorTable[$Criteria]
-                                }
-                            }
-                        }
-                        else {
-                            # COLORIZE A PARTICULAR COLUMN OR CELL
-                        }
-                        break
-                    }
-
-                    "COPY-PASTE" {
-                        # ADD NEW WORKSHEET
-                        $WorkBook.Worksheets.Add()
-
-                        # NUMBER OF WORKSHEETS IN WORKBOOK
-                        $intWorksheetCount = 0
-                        $intWorksheetCount = $WorkBook.Worksheets.Count
-
-                        $DestinationWorksheetName = $CriteriaArray[0].Split('=')[1] # Example: "Test1"
-                        $CopyHeaders = $CriteriaArray[1].Split('=')[1] # Example: "YES/NO"
         
-                        # RENAME WORKSHEET (IN LAST POSITION)
-                        $WorkBook.Worksheets[$intWorksheetCount + 1].Name = $DestinationWorksheetName
+            # APPLY AUTOFILTER
+            $WorkBook.Worksheets[$WorksheetName].UsedRange.AutoFilter($FilterFieldIndex, $FilterCriteriaArray, $xlFilterValues) # Prints index of column where filter was applied.
 
-                        # COPY/PASTE
-                        # $Source = $WorkSheet
-                        # $Destination = $WorkBook.Worksheets[$WorksheetName].Range("A1")
-                        # $Source.CopyTo($Destination, ExcelCopyRangeOptions.All)
+            # SELECT ALL FILTERED CELLS
+            # Note: "SpecialCells" returns a non-contiguous range. You must loop through each area.
+            $FilteredCells = $null
+            $FilteredCells = $WorkBook.Worksheets[$WorksheetName].AutoFilter.Range.SpecialCells($xlCellTypeVisible)
+            $FilteredCells.Select() # Prints "True" if successful.
 
-                        # ACTIVATE WORKSHEET
-                        # $WorkBook.Worksheets[$WorksheetName].Activate()
+            #region NUMBER OF FILTERED WORKSHEET ROWS
+            $FilteredRowCount = -1
+            foreach ($FilteredRow in $FilteredCells.Rows) {
+                $FilteredRowCount++
+            }
+            $Notice = "Number of filtered rows: '" + $FilteredRowCount + "'"
+            # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+            Write-Output ""
+            Write-Output $Notice
+            #endregion NUMBER OF FILTERED WORKSHEET ROWS
+            break
+        }
 
-                        # SET REFERENCE TO WORKSHEET OBJECT
-                        # $WorkSheet = $WorkBook.Worksheets[$WorksheetName]
-                        break
-                    }
+        "FILTER-COLOR" {
+            # FIND HEADER COLUMN INDEX
+            $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Columns.Find($Field).Column # Example: "Country = 2nd column"
+        
+            # # RGB COLOR FILTER
+            $RgbColor = [System.Drawing.Color]::FromArgb($CriteriaArray[0], $CriteriaArray[1], $CriteriaArray[2])
 
-                    Default {
+            # APPLY AUTOFILTER
+            $WorkBook.Worksheets[$WorksheetName].UsedRange.AutoFilter($FilterFieldIndex, $RgbColor, $xlFilterCellColor) # Prints index of column where filter was applied.
 
+            # SELECT ALL FILTERED CELLS
+            # Note: "SpecialCells" returns a non-contiguous range. You must loop through each area.
+            $FilteredCells = $null
+            $FilteredCells = $WorkBook.Worksheets[$WorksheetName].AutoFilter.Range.SpecialCells($xlCellTypeVisible)
+            $FilteredCells.Select() # Prints "True" if successful.
+
+            #region NUMBER OF FILTERED WORKSHEET ROWS
+            $FilteredRowCount = -1
+            foreach ($FilteredRow in $FilteredCells.Rows) {
+                $FilteredRowCount++
+            }
+            $Notice = "Number of filtered rows: '" + $FilteredRowCount + "'"
+            # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+            Write-Output ""
+            Write-Output $Notice
+            #endregion NUMBER OF FILTERED WORKSHEET ROWS
+            break
+        }
+
+        "FILTER-CLEAR" {
+            if ($Field -eq "*") { # Note: "*" represents all columns.
+                # CLEAR AUTOFILTER
+                $WorkBook.Worksheets[$WorksheetName].UsedRange.AutoFilter() # Prints True if filter was successful.
+            }
+            else {
+                # FIND HEADER COLUMN INDEX
+                $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Columns.Find($Field).Column # Example: "Country = 2nd column"
+        
+                # CLEAR AUTOFILTER
+                $WorkBook.Worksheets[$WorksheetName].UsedRange.AutoFilter($FilterFieldIndex) # Prints True if filter was successful.
+            }
+
+            # SELECT ALL FILTERED CELLS
+            # Note: "SpecialCells" returns a non-contiguous range. You must loop through each area.
+            $FilteredCells = $null
+            $FilteredCells = $WorkBook.Worksheets[$WorksheetName].AutoFilter.Range.SpecialCells($xlCellTypeVisible)
+            $FilteredCells.Select() # Prints "True" if successful.
+
+            #region NUMBER OF FILTERED WORKSHEET ROWS
+            $FilteredRowCount = -1
+            foreach ($FilteredRow in $FilteredCells.Rows) {
+                $FilteredRowCount++
+            }
+            $Notice = "Number of filtered rows: '" + $FilteredRowCount + "'"
+            # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
+            Write-Output ""
+            Write-Output $Notice
+            #endregion NUMBER OF FILTERED WORKSHEET ROWS
+            break
+        }
+
+        "SORT" {
+            break
+        }
+
+        "COLORIZE" {
+            # USE FILL COLOR FOR FILTERED CELLS
+            if ($Field -eq "*") { # Note: "*" represents all columns.
+                foreach ($FilteredRow in $FilteredCells.Rows) {
+                    if ($FilteredRow.Row -gt 1) { # Skip header row
+                        $alpha = $ColorTable[$Criteria].Split(',')[0]
+                        $red = $ColorTable[$Criteria].Split(',')[1]
+                        $green = $ColorTable[$Criteria].Split(',')[2]
+                        $blue = $ColorTable[$Criteria].Split(',')[3]
+                        
+                        $RgbColor = [System.Drawing.Color]::FromArgb($alpha, $red, $green, $blue)
+                        $FilteredRow.Interior.Color = $RgbColor
                     }
                 }
-                break
             }
+            else {
+                # COLORIZE A PARTICULAR COLUMN OR CELL
+            }
+            break
+        }
 
-            Default {
+        "ADD-WORKSHEET" {
+            # NUMBER OF WORKSHEETS IN WORKBOOK
+            $intWorksheetCount = 0
+            $intWorksheetCount = $WorkBook.Worksheets.Count
+
+            # ADD NEW WORKSHEET TO WORKBOOK
+            $NewWorksheet = $null
+            # $WorkBook.Worksheets.Add([Before Sheet], [After Sheet], [Number of Sheets to be Added], [Sheet Type])
+            $NewWorksheet = $WorkBook.Worksheets.Add([Type]::Missing, $WorkBook.Worksheets[$intWorksheetCount], 1, $xlWorksheet)
+
+            # RENAME NEW WORKSHEET
+            # $WorkBook.Worksheets[$intWorksheetCount + 1].Name = $NewWorksheetName
+            $NewWorksheet.Name = $WorksheetName
+
+            # ACTIVATE MAIN WORKSHEET
+            $WorkBook.Worksheets[1].Activate()
+            break
+        }
+
+        "COPY-PASTE" {
+            if ($Field -eq "NULL") {
+
             }
+            
+            # COPY FILTERED CELLS
+            $WorkBook.Worksheets[$WorksheetName].AutoFilter.Range.SpecialCells($xlCellTypeVisible).Copy()
+
+            $NewWorksheetName = ""
+            $CopyHeaders = $false
+
+            $NewWorksheetName = $CriteriaArray[0].Split('=')[1] # Example: "Test1"
+            $CopyHeaders = $CriteriaArray[1].Split('=')[1] # Example: "TRUE/FALSE"
+
+            # PASTE CELLS
+            # $WorkBook.Worksheets[$NewWorksheet.Name].Range("A1").PasteSpecial($xlPasteValues, $xlPasteSpecialOperationNone, $false, $false)
+            $WorkBook.Worksheets[$NewWorksheetName].Range("A1").PasteSpecial($xlPasteAll, $xlPasteSpecialOperationNone, $false, $false)
+
+            # GET LAST CELL IN PASTE AREA
+            # $LastCell = $objRange.SpecialCells($xlCellTypeLastCell)
+            $LastCell = $WorkBook.Worksheets[$NewWorksheetName].UsedRange.SpecialCells($xlCellTypeLastCell)
+
+            # ACTIVATE DESTINATION WORKSHEET
+            $WorkBook.Worksheets[$NewWorksheetName].Activate()
+
+            # MOVE TO LAST ROW, FIRST COLUMN ON DESTINATION WORKSHEET (FOR POSSIBLE FUTURE COPY/PASTE OPERATIONS)
+            $WorkBook.Worksheets[$NewWorksheetName].UsedRange.Rows[$LastCell.Row + 1].Columns[1].Cells.Select()
+
+            # ACTIVATE MAIN WORKSHEET
+            $WorkBook.Worksheets[1].Activate()
+            break
+        }
+
+        Default {
+
         }
     }
 }
 #endregion LOOP THROUGH ACTION ITEMS
 
-
-# #region SELECT LAST FILTERED CELL
-# # $LastCell = $WorkSheet.UsedRange.SpecialCells($xlCellTypeLastCell)
-# # $LastCellRowIndex = $LastCell.Row
-# # $LastCellColumnIndex = $LastCell.Column
-# # $LastCell.Select()
-# #endregion SELECT LAST FILTERED CELL
-
+# TURN OFF CLIPBOARD WARNING MESSAGE
+$WorkBook.Application.CutCopyMode = $false
 
 # CLOSE WORKBOOK
 $WorkBook.Close($true) # Note: "$true" = Save file changes. "$false" = Do not save file changes.
