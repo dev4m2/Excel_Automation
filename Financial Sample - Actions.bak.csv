@@ -1,7 +1,0 @@
-WORKSHEET,ACTION,FIELD,CRITERIA
-Sheet1,FILTER-TEXT,Country,[Can*|Franc*|Germ*]
-Sheet1,FILTER-TEXT,Product,[Paseo|Velo]
-Sheet1,FILTER-TEXT,Date,"[9/1/2014|8/1/2014|7/1/2014|""""]"
-Sheet1,COLORIZE,*,[Yellow]
-Sheet1,COPY-PASTE,Null,[Destination=Test1|Headers=YES]
-Sheet1,FILTER-CLEAR,*,

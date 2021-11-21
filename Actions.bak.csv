@@ -2,11 +2,19 @@ WORKSHEET,ACTION,FIELD,CRITERIA
 Sheet1,FILTER-TEXT,Country,[Can*|Franc*|Germ*]
 Sheet1,FILTER-TEXT,Product,[Paseo|Velo]
 Sheet1,FILTER-TEXT,Date,"[9/1/2014|8/1/2014|7/1/2014|""""]"
-Sheet1,COLORIZE,*,[PeachPuff]
+Sheet1,COLOR-FILL,*,[PeachPuff]
 Test1,ADD-WORKSHEET,NULL,[]
 Sheet1,COPY-PASTE,NULL,[Destination=Test1|CopyHeaders=TRUE]
 Sheet1,FILTER-CLEAR,Date,[]
 Sheet1,FILTER-TEXT,Country Code,[10804]
-Sheet1,COLORIZE,*,[PeachPuff]
+Sheet1,COLOR-FILL,*,[PeachPuff]
 Sheet1,FILTER-CLEAR,*,[]
-Sheet1,FILTER-COLOR,Product,[255|218|185]
+Sheet1,FILTER-COLOR,Product,[PeachPuff]
+
+Sheet1,FILTER-TEXT,Country,[Franc*]
+Sheet1,COLOR-FILL,*,[PeachPuff]
+Sheet1,FILTER-CLEAR,Country,[]
+
+Sheet1,FILTER-COLOR,Product,[PeachPuff]
+Sheet1,COLOR-FILL,*,[No Fill]
+Sheet1,FILTER-CLEAR,*,[]

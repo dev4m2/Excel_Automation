@@ -65,30 +65,56 @@ $xlPasteSpecialOperationNone = -4142        # No calculation will be done in the
 $xlPasteSpecialOperationSubtract = 3        # Copied data will be subtracted with the value in the destination cell.
 
 
+# COLORS
+$xlNone = -4142
+
+
+# CELL COLOR INDEX
+# $ColorIndexTable = @(
+#     No Fill = 0;
+#     Black = 1;
+#     White = 2;
+#     Red = 3;
+#     Lime = 4;
+#     Blue = 5;
+#     Yellow = 6;
+#     Fuchsia = 7;
+#     Aqua = 8;
+#     Maroon = 9;
+#     Green = 10;
+#     Navy = 11;
+#     Olive = 12;
+#     Purple = 13;
+#     Teal = 14;
+#     Silver = 15;
+#     Gray = 16;
+# )
+
+
 # CELL COLORS
-$ColorTable = @{
-    Black = "255,0,0,0";
-    White = "255,255,255,255";
-    Red = "255,255,0,0";
-    Lime = "255,0,255,0";
-    Blue = "255,0,0,255";
-    Yellow = "255,255,255,0";
-    Fuchsia = "255,255,0,255";
-    Aqua = "255,0,255,255";
-    Maroon = "255,128,0,0";
-    Green = "255,0,128,0";
-    Navy = "255,0,0,128";
-    Olive = "255,128,128,0";
-    Purple = "255,128,0,128";
-    Teal = "255,0,128,128";
-    Silver = "255,192,192,192";
-    Gray = "255,128,128,128";
-    LimeGreen = "255,50,205,50";
-    PeachPuff = "255,255,218,185"
-}
+# $ColorTable = @{
+#     Black = "255,0,0,0";
+#     White = "255,255,255,255";
+#     Red = "255,255,0,0";
+#     Lime = "255,0,255,0";
+#     Blue = "255,0,0,255";
+#     Yellow = "255,255,255,0";
+#     Fuchsia = "255,255,0,255";
+#     Aqua = "255,0,255,255";
+#     Maroon = "255,128,0,0";
+#     Green = "255,0,128,0";
+#     Navy = "255,0,0,128";
+#     Olive = "255,128,128,0";
+#     Purple = "255,128,0,128";
+#     Teal = "255,0,128,128";
+#     Silver = "255,192,192,192";
+#     Gray = "255,128,128,128";
+#     LimeGreen = "255,50,205,50";
+#     PeachPuff = "255,255,218,185"
+# }
 
 
-# FUNCTIONS
+#region FUNCTIONS
 function ReturnMatchingArrayItems {
     # param ($refArray, $refSearchString)
     param ([string[]]$refArray, [string]$refSearchString)
@@ -109,25 +135,87 @@ function ReturnMatchingArrayItems {
     }
     return $refMatchingItemsArray
 }
+#endregion FUNCTIONS
 
 
-# DATE INFO
-$Date = Get-Date -Format "yyyy-MM-dd"
+#region CLASSES
+class SETTINGS {
+    [string]$Password
+    [string]$FilePath
+    [string]$HeadersPath
+    [string]$ActionsPath
 
-# EXCEL FILEPATH
-$FileDirectory = "C:\Projects\PowerShell\Excel_Automation\"
-$Filename = "Financial Sample"
-$ModifiedFilename = "Financial Sample"
-# $ModifiedFilename = "Modified"
-$FilePath = $FileDirectory + $Filename + "." + "xlsx"
-# $FilePathBackup = $FileDirectory + $Filename + ".bak" + "." + "xlsx"
-$FilePathModified = $FileDirectory + $ModifiedFilename + " " + $Date + "." + "xlsx"
-$FilePathRetainedHeaders = $FileDirectory + $Filename + " - Headers" + "." + "csv"
-# $FilePathActionItems = $FileDirectory + $Filename + " - Filters" + "." + "csv"
-$FilePathActionItems = $FileDirectory + $Filename + " - Actions" + "." + "csv"
+    # CONSTRUCTOR
+    SETTINGS([string]$refFilePathSettings) {
+        [System.Array]$SettingsObject = Import-Csv -Path $refFilePathSettings -Delimiter ","
+        $this.Password = $SettingsObject.PASSWORD
+        $this.FilePath = $SettingsObject.DIRECTORY + $SettingsObject.FILENAME
+        $this.HeadersPath = $SettingsObject.DIRECTORY + $SettingsObject.HEADERS
+        $this.ActionsPath = $SettingsObject.DIRECTORY + $SettingsObject.ACTIONS
+    }
+}
 
-# EXCEL WORKBOOK PASSWORD
-$WorkbookPassword = ""
+
+class ARGB_Color_Object {
+    [string] hidden $color
+    [int] hidden $alpha
+    [int] hidden $red
+    [int] hidden $green
+    [int] hidden $blue
+
+    # CELL COLORS
+    [System.Collections.Hashtable] hidden $ColorTable = @{
+        Black = "255,0,0,0";
+        White = "255,255,255,255";
+        Red = "255,255,0,0";
+        Lime = "255,0,255,0";
+        Blue = "255,0,0,255";
+        Yellow = "255,255,255,0";
+        Fuchsia = "255,255,0,255";
+        Aqua = "255,0,255,255";
+        Maroon = "255,128,0,0";
+        Green = "255,0,128,0";
+        Navy = "255,0,0,128";
+        Olive = "255,128,128,0";
+        Purple = "255,128,0,128";
+        Teal = "255,0,128,128";
+        Silver = "255,192,192,192";
+        Gray = "255,128,128,128";
+        LimeGreen = "255,50,205,50";
+        PeachPuff = "255,255,218,185"
+    }
+
+    # CONSTRUCTOR
+    # ARGB_Color_Object([string]$Color) {
+    #     $this.SetColor($Color)
+    # }
+
+    [void]SetColor([string]$Color) {
+        $this.color = $Color
+        $this.alpha = $this.ColorTable[$Color].Split(',')[0]
+        $this.red = $this.ColorTable[$Color].Split(',')[1]
+        $this.green = $this.ColorTable[$Color].Split(',')[2]
+        $this.blue = $this.ColorTable[$Color].Split(',')[3]
+    }
+
+    [string]GetColor() {
+        # $refColor = $this.alpha + ',' + $this.red + ',' + $this.green + ',' + $this.blue
+        $refColor = $this.color
+        return $refColor
+    }
+
+    [System.Drawing.Color]GetRgbColorObject() {
+        $refRgbColorObject = [System.Drawing.Color]::FromArgb($this.red, $this.green, $this.blue)
+        return $refRgbColorObject
+    }
+    
+    [System.Drawing.Color]GetArgbColorObject() {
+        $refArgbColorObject = [System.Drawing.Color]::FromArgb($this.alpha, $this.red, $this.green, $this.blue)
+        return $refArgbColorObject
+    }
+}
+#endregion CLASSES
+
 
 # WORKSHEET NAME
 $WorksheetName = ""
@@ -135,17 +223,46 @@ $WorksheetName = ""
 # FILTERED CELL ARRAY
 $FilteredCells = $null
 
+# DATE INFO
+# $Date = Get-Date -Format "yyyy-MM-dd"
+
+# SETTINGS FILEPATH
+# $FileDirectory = "C:\Projects\PowerShell\Excel_Automation\"
+# $Filename = "Financial Sample"
+# $ModifiedFilename = "Financial Sample"
+# $ModifiedFilename = "Modified"
+# $FilePath = $FileDirectory + $Filename + "." + "xlsx"
+# $FilePathBackup = $FileDirectory + $Filename + ".bak" + "." + "xlsx"
+# $FilePathModified = $FileDirectory + $ModifiedFilename + " " + $Date + "." + "xlsx"
+# $FilePathRetainedHeaders = $FileDirectory + $Filename + " - Headers" + "." + "csv"
+# $FilePathActionItems = $FileDirectory + $Filename + " - Filters" + "." + "csv"
+# $FilePathActionItems = $FileDirectory + $Filename + " - Actions" + "." + "csv"
+$FilePathSettings = "Settings.csv"
+
+# APP SETTINGS
+# $Settings = Import-Csv -Path $FilePathSettings -Delimiter ","
+$objSettings = [SETTINGS]::new($FilePathSettings)
+
+# EXCEL WORKBOOK PASSWORD
+# $WorkbookPassword = ""
+$WorkbookPassword = $objSettings.Password
+
 # COLUMNS IDENTIFIED FOR RETENTION
 # $RetainedHeadersArray = @("Header", "Segment", "Country", "Product", "Date", "Month Number", "Month Name", "Year")
-$RetainedHeadersArray = Import-Csv -Path $FilePathRetainedHeaders -Delimiter ","
+# $RetainedHeadersArray = Import-Csv -Path $FilePathRetainedHeaders -Delimiter ","
+$RetainedHeadersArray = Import-Csv -Path $objSettings.HeadersPath -Delimiter ","
 
 # ACTION ITEMS FILE
-# $RecordsArray = Get-Content -Path $FilePathActionItems
-$RecordsArray = Import-Csv -Path $FilePathActionItems -Delimiter ","
+# $ActionsArray = Get-Content -Path $FilePathActionItems
+# $ActionsArray = Import-Csv -Path $FilePathActionItems -Delimiter ","
+$ActionsArray = Import-Csv -Path $objSettings.ActionsPath -Delimiter ","
+
+# WORKING EXCEL FILE
+$FilePath = $objSettings.FilePath
 
 # BACKUP FILE(S)
 # Copy-Item $FilePath -Destination $FilePathBackup -Force
-Copy-Item $FilePath -Destination $FilePathModified -Force
+# Copy-Item $FilePath -Destination $FilePathModified -Force
 
 # Note: The following is necessary for such things as "MessageBox".
 # Add-Type -AssemblyName System.Windows.Forms
@@ -158,14 +275,15 @@ $objExcel = New-Object -ComObject Excel.Application
 $objExcel.Visible = $true
 
 # OPEN THE EXCEL FILE
-# $WorkBook = $objExcel.Workbooks.Open($FilePath)
-$WorkBook = $objExcel.Workbooks.Open($FilePathModified)
+$WorkBook = $objExcel.Workbooks.Open($FilePath)
+# $WorkBook = $objExcel.Workbooks.Open($FilePathModified)
 
 
 #region BACKUP WORKBOOK (WITH PASSWORD)
 if (-not ([string]::IsNullOrWhiteSpace($WorkbookPassword))) {
     $objExcel.DisplayAlerts = $false; # Note: "$false" = Do not prompt for confirmation to "over-write" backup file.
-    $WorkBook.SaveAs($FilePathModified, [Type]::Missing, $WorkbookPassword)
+    $WorkBook.SaveAs($FilePath, [Type]::Missing, $WorkbookPassword)
+    # $WorkBook.SaveAs($FilePathModified, [Type]::Missing, $WorkbookPassword)
     $objExcel.DisplayAlerts = $true; # Note: "$true" = Prompt for confirmation to "over-write" backup file.
 }
 #endregion BACKUP WORKBOOK (WITH PASSWORD)
@@ -211,7 +329,7 @@ Write-Output $Notice
 
 #region LOOP THROUGH ACTION ITEMS
 # READ EACH RECORD INTO ARRAY
-for ($intRecordCounter = 0; $intRecordCounter -lt $RecordsArray.Count; $intRecordCounter++) {
+for ($intRecordCounter = 0; $intRecordCounter -lt $ActionsArray.Count; $intRecordCounter++) {
     # CLEAR AUTOFILTER CRITERIA
     [string[]]$FilterCriteriaArray = @()
 
@@ -224,14 +342,14 @@ for ($intRecordCounter = 0; $intRecordCounter -lt $RecordsArray.Count; $intRecor
     # CLEAR FILTER FIELD INDEX
     $FilterFieldIndex = 0
 
-    $WorksheetName = $RecordsArray.Worksheet[$intRecordCounter]
+    $WorksheetName = $ActionsArray.Worksheet[$intRecordCounter]
 
-    $Action = $RecordsArray.Action[$intRecordCounter]
+    $Action = $ActionsArray.Action[$intRecordCounter]
 
-    $Field = $RecordsArray.Field[$intRecordCounter]
+    $Field = $ActionsArray.Field[$intRecordCounter]
 
-    $Criteria = $RecordsArray.Criteria[$intRecordCounter]
-    # $Criteria = $RecordsArray.Criteria[$intRecordCounter].Trim('"').TrimStart('[').TrimEnd(']')
+    $Criteria = $ActionsArray.Criteria[$intRecordCounter]
+    # $Criteria = $ActionsArray.Criteria[$intRecordCounter].Trim('"').TrimStart('[').TrimEnd(']')
 
 
     # REMOVE SURROUNDING QUOTATION MARKS
@@ -250,7 +368,8 @@ for ($intRecordCounter = 0; $intRecordCounter -lt $RecordsArray.Count; $intRecor
     switch ($Action) {
         "FILTER-TEXT" {
             # FIND HEADER COLUMN INDEX
-            $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Columns.Find($Field).Column # Example: "Country = 2nd column"
+            # $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Columns.Find($Field).Column # Example: "Country = 2nd column"
+            $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Rows.Columns.Find($Field).Column # Example: "Country = 2nd column"
 
             # Add-Content log.txt -Value ""
             # Add-Content log.txt -Value $Field
@@ -305,10 +424,14 @@ for ($intRecordCounter = 0; $intRecordCounter -lt $RecordsArray.Count; $intRecor
 
         "FILTER-COLOR" {
             # FIND HEADER COLUMN INDEX
-            $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Columns.Find($Field).Column # Example: "Country = 2nd column"
+            # $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Columns.Find($Field).Column # Example: "Country = 2nd column"
+            $FilterFieldIndex = $WorkBook.Worksheets[$WorksheetName].UsedRange.Rows.Columns.Find($Field).Column # Example: "Country = 2nd column"
         
             # # RGB COLOR FILTER
-            $RgbColor = [System.Drawing.Color]::FromArgb($CriteriaArray[0], $CriteriaArray[1], $CriteriaArray[2])
+            # $RgbColor = [System.Drawing.Color]::FromArgb($CriteriaArray[0], $CriteriaArray[1], $CriteriaArray[2])
+            $objRgbColor = [ARGB_Color_Object]::new()
+            $objRgbColor.SetColor($Criteria)
+            $RgbColor = $objRgbColor.GetRgbColorObject()
 
             # APPLY AUTOFILTER
             $WorkBook.Worksheets[$WorksheetName].UsedRange.AutoFilter($FilterFieldIndex, $RgbColor, $xlFilterCellColor) # Prints index of column where filter was applied.
@@ -368,23 +491,29 @@ for ($intRecordCounter = 0; $intRecordCounter -lt $RecordsArray.Count; $intRecor
             break
         }
 
-        "COLORIZE" {
+        "COLOR-FILL" {
             # USE FILL COLOR FOR FILTERED CELLS
+            if (-not ($Criteria -eq "No Fill")) {
+                $objRgbColor = [ARGB_Color_Object]::new()
+                $objRgbColor.SetColor($Criteria)
+                $RgbColor = $objRgbColor.GetRgbColorObject()
+            }
+
             if ($Field -eq "*") { # Note: "*" represents all columns.
                 foreach ($FilteredRow in $FilteredCells.Rows) {
                     if ($FilteredRow.Row -gt 1) { # Skip header row
-                        $alpha = $ColorTable[$Criteria].Split(',')[0]
-                        $red = $ColorTable[$Criteria].Split(',')[1]
-                        $green = $ColorTable[$Criteria].Split(',')[2]
-                        $blue = $ColorTable[$Criteria].Split(',')[3]
-                        
-                        $RgbColor = [System.Drawing.Color]::FromArgb($alpha, $red, $green, $blue)
-                        $FilteredRow.Interior.Color = $RgbColor
+                        if ($Criteria -eq "No Fill") {
+                            $FilteredRow.Interior.ColorIndex = 0
+                            # $FilteredRow.Interior.ColorIndex = $xlNone
+                        }
+                        else {
+                            $FilteredRow.Interior.Color = $RgbColor
+                        }
                     }
                 }
             }
             else {
-                # COLORIZE A PARTICULAR COLUMN OR CELL
+                # COLOR A PARTICULAR COLUMN OR CELL
             }
             break
         }
