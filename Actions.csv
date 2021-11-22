@@ -1,4 +1,3 @@
 WORKSHEET,ACTION,FIELD,CRITERIA
-Sheet1,FILTER-COLOR,Product,[PeachPuff]
-Sheet1,COLOR-FILL,*,[No Fill]
-Sheet1,FILTER-CLEAR,*,[]
+Sheet1,FILTER-TEXT,Country,[Franc*]
+Sheet1,COLOR-FILL,*,[PeachPuff]
