@@ -471,23 +471,6 @@ for ($intRecordCounter = 0; $intRecordCounter -lt $($ActionsArray | Measure-Obje
                 # CLEAR AUTOFILTER
                 $Workbook.Worksheets[$WorksheetName].UsedRange.AutoFilter($FilterFieldIndex) # Prints True if filter was successful.
             }
-
-            # SELECT ALL FILTERED CELLS
-            # Note: "SpecialCells" returns a non-contiguous range. You must loop through each area.
-            $FilteredCells = $null
-            $FilteredCells = $Workbook.Worksheets[$WorksheetName].AutoFilter.Range.SpecialCells($xlCellTypeVisible)
-            $FilteredCells.Select() # Prints "True" if successful.
-
-            #region NUMBER OF FILTERED WORKSHEET ROWS
-            $FilteredRowCount = -1
-            foreach ($FilteredRow in $FilteredCells.Rows) {
-                $FilteredRowCount++
-            }
-            $Notice = "Number of filtered rows: '" + $FilteredRowCount + "'"
-            # [System.Windows.MessageBox]::Show($Notice) # Prints results of selection, based upon MessageBox options.
-            Write-Output ""
-            Write-Output $Notice
-            #endregion NUMBER OF FILTERED WORKSHEET ROWS
             break
         }
 
